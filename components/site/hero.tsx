@@ -10,7 +10,7 @@ export function Hero() {
   const { open } = useBooking()
 
   return (
-    <section id="home" className="relative overflow-hidden pt-16">
+    <section id="home" className="scroll-mt-16 relative overflow-hidden">
       <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 pt-8 pb-6 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:pt-16 lg:pb-16">
         {/* Copy */}
         <div className="flex flex-col items-start">

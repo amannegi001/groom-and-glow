@@ -18,14 +18,6 @@ const LINKS = [
 export function Navbar() {
   const { open } = useBooking()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : ''
@@ -35,20 +27,13 @@ export function Navbar() {
   }, [menuOpen])
 
   return (
-    <header
-      className={cn(
-        'fixed inset-x-0 top-0 z-50 transition-all duration-300',
-        scrolled
-          ? 'border-b border-border/70 bg-background/85 backdrop-blur-md'
-          : 'bg-transparent',
-      )}
-    >
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <nav
         className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6"
         aria-label="Primary"
       >
-        <a href="#home" className="rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-          <Logo showTagline={false} className="sm:[&_span]:first:size-9" />
+        <a href="#home" className="flex items-center shrink-0 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+          <Logo showTagline={false} />
           <span className="sr-only">Groom and Glow home</span>
         </a>
 

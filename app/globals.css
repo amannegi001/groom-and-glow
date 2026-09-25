@@ -86,6 +86,9 @@
   --input: #ecdcd4;
   --ring: #c85c64;
 
+  /* Height of the fixed site navbar (matches h-16 in components/site/navbar.tsx). */
+  --header-height: 4rem;
+
   --radius: 0.9rem;
 
   --chart-1: #c85c64;
@@ -110,6 +113,12 @@
   }
   html {
     scroll-behavior: smooth;
+    /* Keep anchored content clear of the fixed navbar. */
+    scroll-padding-top: var(--header-height);
+  }
+  section[id],
+  [id] {
+    scroll-margin-top: var(--header-height);
   }
   body {
     @apply bg-background text-foreground;

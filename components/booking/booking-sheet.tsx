@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock,
-  MessageCircle,
+  Loader2,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -59,26 +59,30 @@ type DayOption = {
 }
 
 function buildDays(): DayOption[] {
-  const base = new Date(2026, 8, 14) // 14 Sep 2026
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
   const days: DayOption[] = []
   for (let i = 0; i < 14; i++) {
     const d = new Date(base)
     d.setDate(base.getDate() + i)
     const weekday = d.getDay()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
     days.push({
-      key: d.toISOString().slice(0, 10),
+      key: `${year}-${month}-${day}`,
       weekday: WEEKDAYS[weekday],
       day: d.getDate(),
       month: MONTHS[d.getMonth()],
-      label: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`,
-      available: weekday !== 0, // salon closed on Sundays (mock)
+      label: `${d.getDate()} ${MONTHS[d.getMonth()]} ${year}`,
+      available: weekday !== 0, // salon closed on Sundays
     })
   }
   return days
 }
 
 export function BookingSheet({ isOpen, onClose, initialService }: Props) {
-  const days = useMemo(buildDays, [])
+  const days = useMemo(buildDays, [isOpen])
   const [step, setStep] = useState(0)
   const [service, setService] = useState<Service | undefined>(initialService)
   const [day, setDay] = useState<DayOption | undefined>()
@@ -87,8 +91,18 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
-  const [bookingId, setBookingId] = useState('GG-1042')
+  const [createdAppointment, setCreatedAppointment] = useState<{
+    appointmentId: string
+    serviceName: string
+    appointmentDate: string
+    appointmentTime: string
+    serviceDuration: number
+    serviceFinalPrice: number
+    status: string
+  } | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
   const startStep = initialService ? 1 : 0
@@ -105,6 +119,9 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
       setNote('')
       setErrors({})
       setSubmitted(false)
+      setSubmitting(false)
+      setSubmitError(null)
+      setCreatedAppointment(null)
     }
   }, [isOpen, initialService])
 
@@ -155,12 +172,44 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
     panelRef.current?.scrollTo({ top: 0 })
   }
 
-  const submit = () => {
-    setBookingId(`GG-${1042 + Math.floor(Math.random() * 40)}`)
-    setSubmitted(true)
-  }
-
   const price = service ? discountedPrice(service) : 0
+
+  const submit = async () => {
+    if (!service || !day || !time) return
+    setSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: service.id,
+          appointmentDate: day.label,
+          appointmentTime: time,
+          customerName: name.trim(),
+          customerPhone: phone.trim(),
+          customerNote: note.trim(),
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setSubmitError(data.error || 'Failed to submit appointment request.')
+        setSubmitting(false)
+        return
+      }
+
+      setCreatedAppointment(data.appointment)
+      setSubmitted(true)
+    } catch (err: unknown) {
+      console.error('Booking submission error:', err)
+      setSubmitError('Unable to connect to the server. Please check your internet connection.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div
@@ -201,7 +250,7 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
           )}
           <div className="flex-1 text-center">
             <p className="font-serif text-base font-semibold">
-              {submitted ? 'Booking Request' : 'Book Appointment'}
+              {submitted ? 'Appointment Request' : 'Book Appointment'}
             </p>
             {!submitted && (
               <p className="text-xs text-muted-foreground">
@@ -237,13 +286,8 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
         <div className="flex-1 px-4 py-5">
           {submitted ? (
             <SuccessView
-              service={service}
-              day={day}
-              time={time}
-              name={name}
-              phone={phone}
-              price={price}
-              bookingId={bookingId}
+              appointment={createdAppointment}
+              onClose={onClose}
             />
           ) : (
             <>
@@ -314,7 +358,7 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
                     Choose a date
                   </h3>
                   <p className="mb-4 text-sm text-muted-foreground">
-                    September 2026 · closed on Sundays
+                    Next 14 days · closed on Sundays
                   </p>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                     {days.map((d) => {
@@ -520,10 +564,14 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
                     </dl>
                   </div>
                   <p className="mt-4 flex items-start gap-2 rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">
-                    <MessageCircle className="mt-0.5 size-4 shrink-0 text-[color:var(--rose)]" />
-                    No payment required now. We&apos;ll confirm your appointment
-                    over WhatsApp after reviewing this request.
+                    <Clock className="mt-0.5 size-4 shrink-0 text-[color:var(--burgundy)]" />
+                    No online payment required. Submitting will send your request to Groom &amp; Glow for review. Our team will notify you once accepted.
                   </p>
+                  {submitError && (
+                    <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs font-medium text-destructive">
+                      {submitError}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -546,10 +594,21 @@ export function BookingSheet({ isOpen, onClose, initialService }: Props) {
             ) : (
               <Button
                 size="lg"
+                disabled={submitting}
                 onClick={submit}
                 className="h-12 w-full rounded-full text-sm"
               >
-                Submit Booking Request
+                {submitting ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Sending Request...
+                  </>
+                ) : (
+                  <>
+                    Request Appointment
+                    <ArrowRight className="size-4" />
+                  </>
+                )}
               </Button>
             )}
           </div>
@@ -569,73 +628,78 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 }
 
 function SuccessView({
-  service,
-  day,
-  time,
-  name,
-  phone,
-  price,
-  bookingId,
+  appointment,
+  onClose,
 }: {
-  service?: Service
-  day?: DayOption
-  time?: string
-  name: string
-  phone: string
-  price: number
-  bookingId: string
+  appointment?: {
+    appointmentId: string
+    serviceName: string
+    appointmentDate: string
+    appointmentTime: string
+    serviceDuration: number
+    serviceFinalPrice: number
+    status: string
+  } | null
+  onClose: () => void
 }) {
   return (
     <div className="flex flex-col items-center py-4 text-center animate-in fade-in duration-300">
-      <div className="grid size-16 place-items-center rounded-full bg-secondary/60">
-        <CheckCircle2 className="size-9 text-[color:var(--burgundy)]" />
+      <div className="grid size-16 place-items-center rounded-full bg-secondary/70 text-[color:var(--burgundy)]">
+        <CheckCircle2 className="size-9" />
       </div>
       <h3 className="mt-4 font-serif text-xl font-semibold">
-        Booking Request Received
+        Appointment Request Sent
       </h3>
-      <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-        Your appointment request has been sent to Groom &amp; Glow. We&apos;ll
-        confirm your appointment through WhatsApp.
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+        Your appointment request has been submitted successfully. We&apos;ll
+        review your request and notify you once it has been accepted or rejected.
       </p>
 
-      <div className="mt-4 flex items-center gap-2 rounded-full bg-muted px-4 py-2">
-        <span className="text-xs text-muted-foreground">Booking ID</span>
-        <span className="font-mono text-sm font-semibold">{bookingId}</span>
-      </div>
-
-      <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700">
-        <Clock className="size-3.5" />
-        Status: Pending confirmation
-      </div>
-
-      {/* WhatsApp preview */}
-      <div className="mt-6 w-full text-left">
-        <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <MessageCircle className="size-3.5 text-[#25D366]" />
-          Preview of your WhatsApp update
-        </p>
-        <div className="rounded-2xl rounded-tl-sm border border-[#c8e6c9] bg-[#e8f5e9] p-3 text-sm leading-relaxed text-espresso">
-          <p>Hello {name || 'there'},</p>
-          <p className="mt-2">
-            We&apos;ve received your appointment request at Groom &amp; Glow.
-          </p>
-          <p className="mt-2">
-            Service: {service?.name}
-            <br />
-            Date: {day?.label}
-            <br />
-            Time: {time}
-            <br />
-            Price: {formatINR(price)}
-          </p>
-          <p className="mt-2 text-muted-foreground">
-            You&apos;ll get a confirmation message once our team reviews it.
-          </p>
-          <p className="mt-1 text-right text-[10px] text-muted-foreground">
-            to {phone}
-          </p>
+      {appointment && (
+        <div className="mt-3 flex items-center gap-2 rounded-full bg-muted px-4 py-1.5">
+          <span className="text-xs text-muted-foreground">Request ID</span>
+          <span className="font-mono text-xs font-semibold">
+            {appointment.appointmentId}
+          </span>
         </div>
+      )}
+
+      <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800">
+        <Clock className="size-3.5" />
+        Status: Pending Review
       </div>
+
+      {appointment && (
+        <div className="mt-6 w-full text-left">
+          <p className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            Requested Appointment
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <dl className="divide-y divide-border text-sm">
+              <ReviewRow label="Service" value={appointment.serviceName} />
+              <ReviewRow label="Date" value={appointment.appointmentDate} />
+              <ReviewRow label="Time" value={appointment.appointmentTime} />
+              <ReviewRow
+                label="Duration"
+                value={formatDuration(appointment.serviceDuration)}
+              />
+              <ReviewRow
+                label="Estimated Price"
+                value={formatINR(appointment.serviceFinalPrice)}
+              />
+            </dl>
+          </div>
+        </div>
+      )}
+
+      <Button
+        onClick={onClose}
+        size="lg"
+        className="mt-6 h-12 w-full rounded-full text-sm"
+      >
+        Done
+      </Button>
     </div>
   )
 }
+

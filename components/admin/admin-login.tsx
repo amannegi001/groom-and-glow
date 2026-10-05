@@ -2,13 +2,46 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/logo'
 
-export function AdminLogin({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState('admin@groomandglow.in')
-  const [password, setPassword] = useState('demo1234')
+export function AdminLogin({
+  onLogin,
+}: {
+  onLogin: (adminEmail?: string) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Invalid email or password.')
+        return
+      }
+
+      onLogin(data.admin?.email)
+    } catch {
+      setError('Unable to connect to the server. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-10">
@@ -24,25 +57,34 @@ export function AdminLogin({ onLogin }: { onLogin: () => void }) {
             Sign in to manage your salon.
           </p>
 
-          <form
-            className="mt-6 flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              onLogin()
-            }}
-          >
+          {error && (
+            <div
+              role="alert"
+              className="mt-4 flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="admin-email" className="mb-1.5 block text-sm font-medium">
+              <label
+                htmlFor="admin-email"
+                className="mb-1.5 block text-sm font-medium"
+              >
                 Email
               </label>
               <input
                 id="admin-email"
                 type="email"
                 required
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="username"
-                className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                placeholder="name@groomandglow.in"
+                className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
               />
             </div>
             <div>
@@ -56,20 +98,30 @@ export function AdminLogin({ onLogin }: { onLogin: () => void }) {
                 id="admin-password"
                 type="password"
                 required
+                disabled={loading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                placeholder="••••••••"
+                className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
               />
             </div>
-            <Button type="submit" size="lg" className="mt-1 h-12 w-full rounded-full">
-              Login
+            <Button
+              type="submit"
+              size="lg"
+              disabled={loading}
+              className="mt-1 h-12 w-full rounded-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Login'
+              )}
             </Button>
           </form>
-
-          <p className="mt-4 rounded-xl bg-muted/60 p-3 text-center text-xs text-muted-foreground">
-            Prototype only — demo credentials are pre-filled.
-          </p>
         </div>
 
         <div className="mt-6 text-center">

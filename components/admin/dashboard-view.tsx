@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   CalendarDays,
   CheckCircle2,
@@ -7,21 +8,83 @@ import {
   PackageX,
   Sparkles,
 } from 'lucide-react'
-import { appointments, inventory } from '@/lib/data'
+import { appointments as seedAppointments, inventory } from '@/lib/data'
 import { StatusBadge } from './status-badge'
 
+type DisplayAppointment = {
+  id: string
+  customer: string
+  service: string
+  date: string
+  time: string
+  status: string
+}
+
 export function DashboardView() {
-  const today = '15 Sep 2026'
-  const todays = appointments.filter((a) => a.date === today)
-  const pending = appointments.filter((a) => a.status === 'PENDING').length
-  const confirmed = appointments.filter((a) => a.status === 'CONFIRMED').length
-  const completed = appointments.filter((a) => a.status === 'COMPLETED').length
+  const [appts, setAppts] = useState<DisplayAppointment[]>([])
+
+  useEffect(() => {
+    fetch('/api/appointments')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return
+        if (data.appointments && data.appointments.length > 0) {
+          const mapped: DisplayAppointment[] = data.appointments.map(
+            (a: {
+              _id: string
+              appointmentId?: string
+              customerName: string
+              serviceName: string
+              appointmentDate: string
+              appointmentTime: string
+              status: string
+            }) => ({
+              id: a.appointmentId || a._id,
+              customer: a.customerName,
+              service: a.serviceName,
+              date: a.appointmentDate,
+              time: a.appointmentTime,
+              status: a.status,
+            }),
+          )
+          setAppts(mapped)
+        } else {
+          setAppts(
+            seedAppointments.map((s) => ({
+              id: s.id,
+              customer: s.customer,
+              service: s.service,
+              date: s.date,
+              time: s.time,
+              status: s.status,
+            })),
+          )
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch dashboard appointments:', err)
+        setAppts(
+          seedAppointments.map((s) => ({
+            id: s.id,
+            customer: s.customer,
+            service: s.service,
+            date: s.date,
+            time: s.time,
+            status: s.status,
+          })),
+        )
+      })
+  }, [])
+
+  const pending = appts.filter((a) => a.status.toLowerCase() === 'pending').length
+  const confirmed = appts.filter((a) => a.status.toLowerCase() === 'confirmed').length
+  const completed = appts.filter((a) => a.status.toLowerCase() === 'completed').length
   const lowStock = inventory.filter((i) => i.status !== 'Good').length
 
   const stats = [
     {
-      label: "Today's Appointments",
-      value: todays.length,
+      label: 'Total Requests',
+      value: appts.length,
       icon: CalendarDays,
       tone: 'text-[color:var(--burgundy)] bg-secondary/50',
     },
@@ -51,7 +114,7 @@ export function DashboardView() {
     },
   ]
 
-  const recent = appointments.slice(0, 6)
+  const recent = appts.slice(0, 6)
 
   return (
     <div className="mx-auto max-w-5xl">

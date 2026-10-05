@@ -35,11 +35,13 @@ export function AdminShell({
   section,
   onSection,
   onLogout,
+  adminEmail,
   children,
 }: {
   section: AdminSection
   onSection: (s: AdminSection) => void
   onLogout: () => void
+  adminEmail?: string
   children: React.ReactNode
 }) {
   return (
@@ -88,10 +90,10 @@ export function AdminShell({
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">
-              admin@groomandglow.in
+              {adminEmail || 'admin@groomandglow.in'}
             </span>
             <span className="grid size-9 place-items-center rounded-full bg-secondary/60 font-serif text-sm font-semibold text-[color:var(--burgundy)]">
-              A
+              {(adminEmail ? adminEmail[0] : 'A').toUpperCase()}
             </span>
           </div>
         </header>

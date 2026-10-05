@@ -8,17 +8,47 @@ import { AppointmentsView } from './appointments-view'
 import { ServicesView } from './services-view'
 import { InventoryView } from './inventory-view'
 
-export function AdminApp() {
-  const [authed, setAuthed] = useState(false)
+export function AdminApp({
+  initialAuthenticated = false,
+  adminEmail,
+}: {
+  initialAuthenticated?: boolean
+  adminEmail?: string
+}) {
+  const [authed, setAuthed] = useState(initialAuthenticated)
+  const [currentEmail, setCurrentEmail] = useState(adminEmail || '')
   const [section, setSection] = useState<AdminSection>('dashboard')
 
-  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />
+  const handleLogin = (email?: string) => {
+    if (email) {
+      setCurrentEmail(email)
+    }
+    setAuthed(true)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', {
+        method: 'POST',
+      })
+    } catch (err) {
+      console.error('Error logging out:', err)
+    } finally {
+      setAuthed(false)
+      setCurrentEmail('')
+    }
+  }
+
+  if (!authed) {
+    return <AdminLogin onLogin={handleLogin} />
+  }
 
   return (
     <AdminShell
       section={section}
       onSection={setSection}
-      onLogout={() => setAuthed(false)}
+      onLogout={handleLogout}
+      adminEmail={currentEmail}
     >
       {section === 'dashboard' && <DashboardView />}
       {section === 'appointments' && <AppointmentsView />}
